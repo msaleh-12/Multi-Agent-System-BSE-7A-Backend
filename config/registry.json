@@ -21,7 +21,7 @@
       "how does",
       "why"
     ],
-    "status": "offline"
+    "status": "healthy"
   },
   {
     "id": "adaptive_quiz_master_agent",
@@ -47,7 +47,7 @@
       "true false questions",
       "generate questions"
     ],
-    "status": "offline"
+    "status": "healthy"
   },
   {
     "id": "assignment_coach_agent",
