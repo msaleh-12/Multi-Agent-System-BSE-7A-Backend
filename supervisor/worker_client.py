@@ -39,6 +39,39 @@ async def forward_to_agent(agent_id: str, payload: RequestPayload) -> RequestRes
             )
         _logger.info(f"Agent {agent_id} is now healthy. Proceeding with request.")
 
+    # Custom routing for proctor-ai agent (additive, does not remove any logic)
+    if agent.id == "proctor-ai":
+        start_time = time.time()
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    f"{agent.url}/api/supervisor/analyze",
+                    content=payload.model_dump_json(),
+                    headers={"Content-Type": "application/json"},
+                    timeout=15.0
+                )
+                response.raise_for_status()
+                result = response.json()
+                execution_time = (time.time() - start_time) * 1000
+                response_dict = {
+                    "response": result,
+                    "agentId": agent.id,
+                    "timestamp": datetime.utcnow(),
+                    "metadata": {
+                        "executionTime": execution_time,
+                        "agentTrace": [agent.id],
+                        "participatingAgents": [agent.id],
+                        "cached": False
+                    }
+                }
+                return RequestResponse.model_validate(response_dict)
+        except Exception as e:
+            _logger.exception(f"Error calling proctor-ai /api/supervisor/analyze: {e}")
+            return RequestResponse(
+                error=ErrorInfo(code="AGENT_ERROR", message=str(e))
+            )
+
+    # Default/original logic for all other agents
     task_envelope = TaskEnvelope(
         message_id=str(uuid.uuid4()),
         sender="SupervisorAgent_Main",

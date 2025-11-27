@@ -5,5 +5,13 @@
     "url": "http://localhost:5010",
     "description": "LLM wrapper for text generation",
     "capabilities": ["text-generation"]
+  },
+
+  {
+    "id": "proctor-ai",
+    "name": "Proctor AI",
+    "url": "http://localhost:8080",
+    "description": "Proctoring and study analysis agent",
+    "capabilities": ["proctoring", "analysis"]
   }
 ]
