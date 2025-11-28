@@ -153,6 +153,18 @@ def build_agent_payload(agent_id: str, user_request: str, intent_info: Dict[str,
         # pass-through any other extracted params
         payload.update({k: v for k, v in extracted.items() if k not in ('topic', 'keywords', 'year_range', 'max_results')})
 
+    elif agent_id in ("concept_reinforcement_agent", "concept-reinforcement-agent", "concept_reinforcement"):
+        # concept_reinforcement expects a specific payload structure
+        payload_data = {
+            "student_id": extracted.get('student_id') or extracted.get('user_id') or 'default_student',
+            "weak_topics": extracted.get('weak_topics') or extracted.get('topics') or [],
+            "preferences": {
+                "learning_style": extracted.get('learning_style') or 'visual',
+                "max_tasks": extracted.get('max_tasks') or 3
+            }
+        }
+        payload['payload'] = payload_data
+
     else:
         # Generic fallback: include extracted params under `params`
         if extracted:
