@@ -21,12 +21,12 @@
       "how does",
       "why"
     ],
-    "status": "offline"
+    "status": "healthy"
   },
   {
     "id": "adaptive_quiz_master_agent",
     "name": "Quiz Generation Specialist",
-    "url": "http://adaptive-quiz-agent:5011",
+    "url": "http://adaptive-quiz-agent:5020",
     "description": "ONLY use for creating, generating, or making quizzes, tests, or practice questions. Specializes in: generating MCQs, true/false, short answer questions with specified difficulty levels and topics. Use when user wants to CREATE or GENERATE quiz questions, NOT for finding existing questions or predicting exam content.",
     "capabilities": [
       "quiz-generation",
@@ -47,7 +47,7 @@
       "true false questions",
       "generate questions"
     ],
-    "status": "offline"
+    "status": "healthy"
   },
   {
     "id": "assignment_coach_agent",

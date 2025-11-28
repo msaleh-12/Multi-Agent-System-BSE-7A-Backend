@@ -2,7 +2,7 @@
 import logging
 import asyncio
 import yaml
-from fastapi import FastAPI, Depends, HTTPException, Body
+from fastapi import FastAPI, Depends, HTTPException, Body, Query
 from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Optional, List
@@ -12,6 +12,7 @@ from pydantic import BaseModel
 from shared.models import RequestPayload, RequestResponse, User
 from supervisor import registry, memory_manager, auth, routing
 from supervisor.worker_client import forward_to_agent
+from supervisor.gemini_chat_orchestrator import get_orchestrator
 
 logging.basicConfig(level=logging.INFO)
 _logger = logging.getLogger(__name__)
@@ -85,6 +86,161 @@ async def get_current_user(user: User = Depends(auth.require_auth)):
 @app.get('/api/supervisor/registry')
 async def get_registry(user: User = Depends(auth.require_auth)):
     return {"agents": registry.list_agents()}
+
+@app.post('/api/supervisor/request-unified')
+async def submit_request_unified(
+    payload: EnhancedRequestPayload,
+    user: User = Depends(auth.require_auth),
+    use_orchestrator: bool = Query(True, description="Use unified Gemini orchestrator")
+):
+    """
+    NEW: Unified Gemini-based chat handler endpoint.
+    Uses a single Gemini call to handle intent identification, parameter extraction,
+    and agent routing in one conversational flow.
+    
+    This is the recommended endpoint for new integrations.
+    
+    Returns either:
+    - status="CLARIFICATION_NEEDED" with clarifying_questions (ask user for more info)
+    - status="READY_TO_ROUTE" with agent_id and agent_payload (ready to forward to agent)
+    """
+    user_id = user.id
+    user_query = payload.request
+    
+    try:
+        # Get or create orchestrator instance per user
+        # In production, you might want to manage orchestrator per conversation_id
+        orchestrator = get_orchestrator()
+        
+        # Store user message in memory
+        memory_manager.store_conversation_message(
+            user_id=user_id,
+            role="user",
+            content=user_query
+        )
+        
+        # Process through unified orchestrator
+        _logger.info(f"Processing unified request for user {user_id}: {user_query[:100]}...")
+        orchestrator_response = await orchestrator.process_message(user_query)
+        
+        # Convert to dict for JSON response
+        response_dict = {
+            "status": orchestrator_response.status,
+            "agent_id": orchestrator_response.agent_id,
+            "confidence": orchestrator_response.confidence,
+            "reasoning": orchestrator_response.reasoning,
+            "extracted_params": orchestrator_response.extracted_params,
+            "clarifying_questions": orchestrator_response.clarifying_questions,
+        }
+        
+        # If ready to route, check agent health and forward
+        if orchestrator_response.status == "READY_TO_ROUTE":
+            agent_id = orchestrator_response.agent_id
+            agent_payload = orchestrator_response.agent_payload
+            
+            # Verify agent exists and is healthy
+            agent = registry.get_agent(agent_id)
+            if not agent:
+                return {
+                    "status": "CLARIFICATION_NEEDED",
+                    "agent_id": None,
+                    "confidence": 0.0,
+                    "reasoning": f"Agent {agent_id} not found in registry",
+                    "extracted_params": orchestrator_response.extracted_params,
+                    "clarifying_questions": ["Let me rephrase that request. Could you provide more details?"]
+                }
+            
+            if agent.status != "healthy":
+                return {
+                    "status": "CLARIFICATION_NEEDED",
+                    "agent_id": None,
+                    "confidence": 0.0,
+                    "reasoning": f"Agent {agent_id} is currently {agent.status}",
+                    "extracted_params": orchestrator_response.extracted_params,
+                    "clarifying_questions": ["The required specialist is currently offline. Please try again in a moment."]
+                }
+            
+            # Forward to agent
+            try:
+                _logger.info(f"Forwarding to {agent_id} with payload: {agent_payload}")
+                
+                # Create RequestPayload for forwarding
+                forward_payload = RequestPayload(
+                    agentId=agent_id,
+                    request=user_query,
+                    autoRoute=False
+                )
+                
+                # Forward and get response
+                agent_response = await forward_to_agent(
+                    agent_id, 
+                    forward_payload, 
+                    agent_specific=agent_payload
+                )
+                
+                # Store in memory and return
+                memory_manager.store_conversation_message(
+                    user_id=user_id,
+                    role="assistant",
+                    content=getattr(agent_response, 'response', str(agent_response)),
+                    agent_id=agent_id
+                )
+                
+                # Build response with both orchestrator and agent info
+                response_content = getattr(agent_response, 'response', str(agent_response))
+                response_dict = {
+                    "status": "AGENT_RESPONSE",
+                    "agent_id": agent_id,
+                    "agent_name": agent.name,
+                    "response": response_content,
+                    "confidence": orchestrator_response.confidence,
+                    "reasoning": orchestrator_response.reasoning,
+                    "extracted_params": orchestrator_response.extracted_params,
+                    "metadata": {
+                        "identified_agent": agent_id,
+                        "agent_name": agent.name,
+                        "confidence": orchestrator_response.confidence,
+                        "reasoning": orchestrator_response.reasoning,
+                        "extracted_params": orchestrator_response.extracted_params,
+                    }
+                }
+                
+                if hasattr(agent_response, 'error') and agent_response.error:
+                    response_dict["error"] = agent_response.error.dict() if hasattr(agent_response.error, 'dict') else str(agent_response.error)
+                
+                return response_dict
+                
+            except Exception as e:
+                _logger.error(f"Error forwarding to agent {agent_id}: {e}")
+                return {
+                    "status": "ERROR",
+                    "agent_id": agent_id,
+                    "confidence": 0.0,
+                    "reasoning": f"Failed to forward to agent: {str(e)}",
+                    "extracted_params": orchestrator_response.extracted_params,
+                    "error": str(e)
+                }
+        
+        else:  # CLARIFICATION_NEEDED
+            # Just return the clarification response
+            response_dict["status"] = "clarification_needed"
+            memory_manager.store_conversation_message(
+                user_id=user_id,
+                role="assistant",
+                content=f"Clarification: {response_dict['reasoning']}"
+            )
+            return response_dict
+        
+    except Exception as e:
+        _logger.error(f"Error in unified request handler: {e}", exc_info=True)
+        return {
+            "status": "ERROR",
+            "agent_id": None,
+            "confidence": 0.0,
+            "reasoning": f"Error processing request: {str(e)}",
+            "extracted_params": {},
+            "error": str(e)
+        }
 
 @app.post('/api/supervisor/request')
 async def submit_request(

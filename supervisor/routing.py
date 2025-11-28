@@ -153,6 +153,47 @@ def build_agent_payload(agent_id: str, user_request: str, intent_info: Dict[str,
         # pass-through any other extracted params
         payload.update({k: v for k, v in extracted.items() if k not in ('topic', 'keywords', 'year_range', 'max_results')})
 
+    elif agent_id in ("adaptive_quiz_master_agent", "adaptive-quiz-master", "adaptive_quiz_master"):
+        # Quiz master expects agent_name, intent, and nested payload structure
+        import uuid as _uuid
+        
+        # Map difficulty to bloom taxonomy level
+        difficulty = (extracted.get("difficulty") or "intermediate").lower()
+        bloom_map = {
+            "beginner": "remember",
+            "easy": "remember",
+            "intermediate": "understand",
+            "medium": "apply",
+            "advanced": "analyze",
+            "hard": "evaluate",
+            "expert": "create"
+        }
+        bloom_level = bloom_map.get(difficulty, "understand")
+        
+        # Use Python Loops as default - a topic that exists in the question bank
+        topic = extracted.get("topic") or extracted.get("subject") or "Python Loops"
+        
+        return {
+            "agent_name": "adaptive_quiz_master_agent",
+            "intent": "generate_adaptive_quiz",
+            "payload": {
+                "user_info": {
+                    "user_id": extracted.get("user_id") or "default_user",
+                    "learning_level": difficulty
+                },
+                "quiz_request": {
+                    "topic": topic,
+                    "num_questions": int(extracted.get("num_questions", 5)) if extracted.get("num_questions") else 5,
+                    "question_types": ["mcq", "true_false"],
+                    "bloom_taxonomy_level": bloom_level,
+                    "adaptive": True
+                },
+                "session_info": {
+                    "session_id": str(_uuid.uuid4())
+                }
+            }
+        }
+
     else:
         # Generic fallback: include extracted params under `params`
         if extracted:

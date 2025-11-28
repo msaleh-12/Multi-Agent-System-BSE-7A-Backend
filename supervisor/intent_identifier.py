@@ -17,8 +17,8 @@ else:
     genai.configure(api_key=GEMINI_API_KEY)
 
 # Configuration
-CONFIDENCE_THRESHOLD = 0.70  # Minimum confidence to proceed without clarification
-MIN_ACCEPTABLE_CONFIDENCE = 0.50  # Below this, always ask for clarification
+CONFIDENCE_THRESHOLD = 0.60  # Minimum confidence to proceed without clarification
+MIN_ACCEPTABLE_CONFIDENCE = 0.40  # Below this, always ask for clarification
 BASE_DIR = Path(__file__).parent.parent
 REGISTRY_FILE = BASE_DIR / "config" / "registry.json"
 
@@ -129,13 +129,17 @@ Respond with ONLY a JSON object in this EXACT format (no markdown, no backticks)
 
 1. **High Confidence (0.8-1.0)**: 
    - Query clearly matches ONE agent's primary function
-   - All key information is present
+   - All REQUIRED parameters are present
    - No ambiguity in intent
 
 2. **Medium Confidence (0.5-0.79)**:
-   - Query matches agent but missing some details
-   - Could potentially match multiple agents
-   - Consider listing alternatives
+   - Query matches agent but missing REQUIRED details
+   - Set "is_ambiguous": true and ask for the missing required params
+   - REQUIRED params by agent:
+     * adaptive_quiz_master_agent: REQUIRES "topic" (what subject to quiz on)
+     * research_scout_agent: REQUIRES "topic" (what to research)
+     * plagiarism_prevention_agent: REQUIRES text content
+     * gemini-wrapper: No required params
 
 3. **Low Confidence (< 0.5)**:
    - Query is vague or unclear
@@ -149,9 +153,10 @@ Respond with ONLY a JSON object in this EXACT format (no markdown, no backticks)
    - If no specific agent matches well, use "gemini-wrapper" for general queries
 
 5. **Clarifying Questions Guidelines**:
-   - Ask SPECIFIC questions that help identify the right agent
-   - Focus on: What task? What subject? What type of help needed?
-   - Keep questions simple and direct
+   - Ask SPECIFIC questions about missing REQUIRED parameters
+   - For quiz without topic: "What topic would you like to be quizzed on? (e.g., Python, Math, History)"
+   - For research without topic: "What topic would you like me to research?"
+   - NEVER ask generic questions like "What do you need help with?"
 
 6. **Parameter Extraction**:
    - Extract ALL relevant details mentioned in query
@@ -162,6 +167,9 @@ Respond with ONLY a JSON object in this EXACT format (no markdown, no backticks)
 
 Query: "Create a quiz on Python with 10 questions"
 → agent_id: "adaptive_quiz_master_agent", confidence: 0.95, extracted_params: {{"topic": "Python", "num_questions": 10}}
+
+Query: "I need practice questions for a quiz"
+→ agent_id: "adaptive_quiz_master_agent", confidence: 0.6, is_ambiguous: true, clarifying_questions: ["What topic would you like to be quizzed on? (e.g., Python, Math, History)"]
 
 Query: "Help me with my assignment"
 → is_ambiguous: true, clarifying_questions: ["What subject is your assignment on?", "What specific help do you need (understanding, breakdown, resources)?"]
@@ -215,6 +223,22 @@ Now analyze the current user query and respond with the JSON object."""
             # Parse JSON response
             intent_result = json.loads(response_text)
             
+            # Normalize clarifying_questions - ensure it's always a list of strings
+            # Gemini might return objects like [{field: "topic", question: "..."}, ...]
+            raw_questions = intent_result.get("clarifying_questions", [])
+            if raw_questions:
+                normalized_questions = []
+                for q in raw_questions:
+                    if isinstance(q, str):
+                        normalized_questions.append(q)
+                    elif isinstance(q, dict):
+                        # Extract the question text from object format
+                        question_text = q.get("question") or q.get("text") or q.get("message") or str(q)
+                        normalized_questions.append(question_text)
+                    else:
+                        normalized_questions.append(str(q))
+                intent_result["clarifying_questions"] = normalized_questions
+            
             # Validate agent_id exists
             agent_id = intent_result.get("agent_id")
             if agent_id not in self.agent_descriptions:
@@ -247,11 +271,24 @@ Now analyze the current user query and respond with the JSON object."""
             return self._fallback_intent(user_query)
             
         except Exception as e:
+            error_str = str(e)
             _logger.error(f"Error in intent identification: {e}")
+            
+            # Check for rate limit error - if so, use smart fallback without clarification
+            if "429" in error_str or "quota" in error_str.lower() or "rate" in error_str.lower():
+                _logger.warning("Rate limit hit - using keyword-based routing without clarification")
+                return self._fallback_intent(user_query, skip_clarification=True)
+            
             return self._fallback_intent(user_query)
     
-    def _fallback_intent(self, user_query: str) -> Dict:
-        """Fallback when LLM fails - use keyword matching."""
+    def _fallback_intent(self, user_query: str, skip_clarification: bool = False) -> Dict:
+        """Fallback when LLM fails - use keyword matching.
+        
+        Args:
+            user_query: The user's query
+            skip_clarification: If True, don't ask for clarification even on low confidence
+                              (used when we know LLM is unavailable due to rate limits)
+        """
         _logger.warning("Using fallback keyword-based intent identification")
         
         query_lower = user_query.lower()
@@ -266,30 +303,25 @@ Now analyze the current user query and respond with the JSON object."""
                 best_match = agent_id
         
         if best_match and best_score > 0:
-            confidence = min(0.7, best_score * 0.2)
+            # Be more generous with confidence when skipping clarification
+            confidence = min(0.85, best_score * 0.3) if skip_clarification else min(0.7, best_score * 0.2)
             return {
                 "agent_id": best_match,
                 "confidence": confidence,
-                "reasoning": "Fallback keyword matching used",
-                "is_ambiguous": confidence < CONFIDENCE_THRESHOLD,
-                "clarifying_questions": [
-                    "Could you provide more details about your request?",
-                    "What specific help do you need?"
-                ] if confidence < CONFIDENCE_THRESHOLD else [],
+                "reasoning": "Keyword matching used (LLM unavailable)" if skip_clarification else "Fallback keyword matching used",
+                "is_ambiguous": False if skip_clarification else (confidence < CONFIDENCE_THRESHOLD),
+                "clarifying_questions": [],  # Don't ask clarification in fallback
                 "extracted_params": {},
                 "alternative_agents": []
             }
         
-        # Ultimate fallback to gemini-wrapper
+        # Ultimate fallback to gemini-wrapper - just route there without clarification
         return {
-            "agent_id": "gemini-wrapper",
-            "confidence": 0.3,
-            "reasoning": "No specific agent matched, using general LLM",
-            "is_ambiguous": True,
-            "clarifying_questions": [
-                "What would you like help with?",
-                "Could you describe your task in more detail?"
-            ],
+            "agent_id": "gemini_wrapper_agent",
+            "confidence": 0.6 if skip_clarification else 0.3,
+            "reasoning": "Routing to general assistant (LLM unavailable)" if skip_clarification else "No specific agent matched, using general LLM",
+            "is_ambiguous": False if skip_clarification else True,
+            "clarifying_questions": [],  # Don't ask clarification in fallback
             "extracted_params": {},
             "alternative_agents": []
         }

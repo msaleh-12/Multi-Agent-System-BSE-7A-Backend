@@ -55,14 +55,27 @@ async def forward_to_agent(agent_id: str, payload: RequestPayload, agent_specifi
             )
         _logger.info(f"Agent {agent_id} is now healthy. Proceeding with request.")
 
-    # Build task parameters by combining the validated RequestPayload fields
-    # with any agent-specific fields (e.g., 'data' expected by research_scout).
-    task_parameters = payload.dict()
+    # Build task parameters - if agent_specific is provided with the required
+    # agent format (agent_name, intent, payload), use it directly.
+    # Otherwise, merge with RequestPayload fields for backward compatibility.
     if agent_specific and isinstance(agent_specific, dict):
-        # Merge agent-specific keys, but don't overwrite non-empty existing keys
-        for k, v in agent_specific.items():
-            if k not in task_parameters or task_parameters.get(k) in (None, ""):
-                task_parameters[k] = v
+        # Check if agent_specific has the required agent structure
+        if "agent_name" in agent_specific and "intent" in agent_specific and "payload" in agent_specific:
+            # Use agent_specific directly as task parameters - it's properly formatted
+            task_parameters = agent_specific.copy()
+            # Also include the original request text for context
+            task_parameters["original_request"] = payload.request
+            _logger.info(f"Using structured agent_specific payload for {agent_id}")
+        else:
+            # Fall back to merging approach for backward compatibility
+            task_parameters = payload.dict()
+            for k, v in agent_specific.items():
+                if k not in task_parameters or task_parameters.get(k) in (None, ""):
+                    task_parameters[k] = v
+            _logger.info(f"Using merged payload for {agent_id}")
+    else:
+        task_parameters = payload.dict()
+        _logger.info(f"Using basic RequestPayload for {agent_id}")
 
     task_envelope = TaskEnvelope(
         message_id=str(uuid.uuid4()),
