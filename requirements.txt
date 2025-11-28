@@ -11,5 +11,7 @@ pytest
 requests
 aiosqlite
 google-generativeai
-dotenv
+python-dotenv
+langchain-core
+langchain-groq
 
