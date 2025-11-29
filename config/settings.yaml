@@ -9,10 +9,11 @@ supervisor:
 gemini_wrapper:
   host: 127.0.0.1
   port: 5010
-  mode: "auto"  # auto -> cloud if env present else mock
+  mode: "auto" # auto -> cloud if env present else mock
   external_api_url: "${GEMINI_API_URL}"
   api_key_env: "GEMINI_API_KEY"
 
+<<<<<<< HEAD
 adaptive_quiz_master:
   host: 127.0.0.1
   port: 5020
@@ -35,3 +36,21 @@ peer_collaboration:
   host: 127.0.0.1
   port: 5011
   mode: "local"  # no external API needed
+=======
+exam_readiness_agent:
+  host: 127.0.0.1
+  port: 8003
+  mode: "auto" # auto -> cloud if GEMINI_API_KEY present else mock
+  api_key_env: "GEMINI_API_KEY"
+  default_model: "gemini-2.5-flash"
+  max_tokens: 8000
+  # RAG settings
+  rag_chunk_size: 500
+  rag_chunk_overlap: 100
+  rag_top_k: 6
+  rag_max_chars: 4000
+  # Question generation defaults
+  default_assessment_type: "quiz"
+  default_difficulty: "medium"
+  allow_latex: true
+>>>>>>> exam_readiness_agent/agent/assessment_generation

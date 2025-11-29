@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import List, Optional, Literal
+from typing import List, Optional, Literal, Any
 from datetime import datetime
 
 class User(BaseModel):
@@ -22,6 +22,8 @@ class Message(BaseModel):
     timestamp: datetime = Field(default_factory=datetime.utcnow)
 
 class RequestPayload(BaseModel):
+    model_config = {"extra": "allow"}  # Allow extra fields to be passed through
+    
     agentId: str
     request: str
     priority: int = 1
@@ -40,7 +42,7 @@ class RequestResponseMetadata(BaseModel):
     cached: bool = False
 
 class RequestResponse(BaseModel):
-    response: Optional[str] = None
+    response: Optional[Any] = None
     agentId: Optional[str] = None
     timestamp: datetime = Field(default_factory=datetime.utcnow)
     metadata: Optional[RequestResponseMetadata] = None
