@@ -1,0 +1,18 @@
+{
+  "student_id": "STU001",
+  "input": {
+    "student_text": "Artificial intelligence is transforming the way we work and live. Machine learning algorithms can analyze vast amounts of data to identify patterns and make predictions. This technology has applications in healthcare, finance, and education.",
+    "submission_id": "SUB001",
+    "timestamp": "2024-01-15T10:30:00Z"
+  },
+  "processing": {
+    "comparison_sources": [
+      "synthetic_dataset",
+      "public_dataset"
+    ],
+    "method": "sentence_by_sentence_rephrasing",
+    "preserve_meaning": true,
+    "improve_originality": true
+  }
+}
+
