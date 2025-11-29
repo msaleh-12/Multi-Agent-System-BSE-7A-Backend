@@ -4,6 +4,8 @@ from pydantic import BaseModel, Field
 from typing import Dict, List, Optional, Any
 from enum import Enum
 from contextlib import asynccontextmanager
+import asyncio
+from functools import partial
 import uvicorn
 import os
 from pathlib import Path
@@ -266,16 +268,22 @@ async def process_task(req: Request):
             rag_context = context_text
         
         # Generate questions using existing service
-        all_questions, type_errors = generate_questions_by_type(
-            subject=assessment_data["subject"],
-            assessment_type=assessment_data["assessment_type"],
-            difficulty=assessment_data["difficulty"],
-            type_counts=type_counts,
-            allow_latex=assessment_data["allow_latex"],
-            rag_context=rag_context,
-            pdf_paths=None,
-            rag_top_k=assessment_data["rag_top_k"],
-            rag_max_chars=assessment_data["rag_max_chars"],
+        # Run in executor to avoid blocking the event loop during long generation
+        loop = asyncio.get_event_loop()
+        all_questions, type_errors = await loop.run_in_executor(
+            None,  # Use default executor (ThreadPoolExecutor)
+            partial(
+                generate_questions_by_type,
+                subject=assessment_data["subject"],
+                assessment_type=assessment_data["assessment_type"],
+                difficulty=assessment_data["difficulty"],
+                type_counts=type_counts,
+                allow_latex=assessment_data["allow_latex"],
+                rag_context=rag_context,
+                pdf_paths=None,
+                rag_top_k=assessment_data["rag_top_k"],
+                rag_max_chars=assessment_data["rag_max_chars"],
+            )
         )
         
         # Check for generation errors

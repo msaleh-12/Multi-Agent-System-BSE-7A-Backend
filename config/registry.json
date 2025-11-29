@@ -389,6 +389,12 @@
       "evaluate preparation",
       "mock test"
     ],
-    "status": "offline"
+    "required_params": [
+      "subject",
+      "assessment_type",
+      "difficulty",
+      "question_count"
+    ],
+    "status": "healthy"
   }
 ]

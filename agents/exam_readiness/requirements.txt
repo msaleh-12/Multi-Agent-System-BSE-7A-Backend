@@ -1,0 +1,19 @@
+fastapi>=0.100.0
+uvicorn>=0.23.0
+pydantic>=2.0.0
+python-dotenv>=1.0.0
+google-generativeai>=0.3.0
+aiosqlite>=0.19.0
+langchain>=0.1.0
+langchain-huggingface>=0.0.1
+langchain-community>=0.0.1
+langchain-text-splitters>=0.0.1
+sentence-transformers>=2.2.0
+faiss-cpu>=1.7.0
+pypdf>=3.0.0
+unstructured>=0.10.0
+reportlab>=4.0.0
+python-multipart>=0.0.6
+# Use CPU-only torch to avoid huge CUDA downloads
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch

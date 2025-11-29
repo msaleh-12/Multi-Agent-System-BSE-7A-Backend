@@ -311,6 +311,50 @@ def build_agent_payload(agent_id: str, user_request: str, intent_info: Dict[str,
             }
         }
 
+    elif agent_id in ("exam_readiness_agent", "exam-readiness-agent", "exam_readiness"):
+        # exam_readiness expects assessment generation parameters
+        # Map assessment_type to valid enum values
+        assessment_type = (extracted.get("assessment_type") or "quiz").lower()
+        valid_types = ["quiz", "exam", "assignment"]
+        if assessment_type not in valid_types:
+            assessment_type = "quiz"
+        
+        # Map difficulty to valid enum values
+        difficulty = (extracted.get("difficulty") or "medium").lower()
+        valid_difficulties = ["easy", "medium", "hard"]
+        if difficulty not in valid_difficulties:
+            difficulty_map = {
+                "beginner": "easy",
+                "intermediate": "medium", 
+                "advanced": "hard"
+            }
+            difficulty = difficulty_map.get(difficulty, "medium")
+        
+        # Get question count
+        question_count = extracted.get("question_count") or extracted.get("num_questions") or 5
+        if isinstance(question_count, str):
+            try:
+                question_count = int(question_count)
+            except ValueError:
+                question_count = 5
+        
+        # Build type_counts
+        type_counts = extracted.get("type_counts")
+        if not type_counts:
+            type_counts = {"mcq": question_count}
+        
+        payload = {
+            "subject": extracted.get("subject") or extracted.get("topic") or "General",
+            "assessment_type": assessment_type,
+            "difficulty": difficulty,
+            "question_count": question_count,
+            "type_counts": type_counts,
+            "allow_latex": extracted.get("allow_latex", True),
+            "created_by": extracted.get("created_by") or "supervisor",
+            "use_rag": extracted.get("use_rag", False),
+            "export_pdf": extracted.get("export_pdf", False)
+        }
+
     else:
         # Generic fallback: include extracted params under `params`
         if extracted:

@@ -55,7 +55,6 @@ async def forward_to_agent(agent_id: str, payload: RequestPayload, agent_specifi
             )
         _logger.info(f"Agent {agent_id} is now healthy. Proceeding with request.")
 
-<<<<<<< HEAD
     # Custom routing for proctor-ai agent (additive, does not remove any logic)
     if agent.id == "proctor-ai":
         start_time = time.time()
@@ -70,32 +69,6 @@ async def forward_to_agent(agent_id: str, payload: RequestPayload, agent_specifi
                 response.raise_for_status()
                 result = response.json()
                 execution_time = (time.time() - start_time) * 1000
-=======
-    task_envelope = TaskEnvelope(
-        message_id=str(uuid.uuid4()),
-        sender="SupervisorAgent_Main",
-        recipient=agent.id,
-        task=Task(name="process_request", parameters=payload.dict())
-    )
-
-    start_time = time.time()
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                f"{agent.url}/process", 
-                content=task_envelope.json(), 
-                headers={"Content-Type": "application/json"},
-                timeout=45.0
-            )
-            response.raise_for_status()
-            
-            completion_report_data = response.json()
-            completion_report = CompletionReport(**completion_report_data)
-
-            execution_time = (time.time() - start_time) * 1000
-
-            if completion_report.status == "SUCCESS":
->>>>>>> exam_readiness_agent/agent/assessment_generation
                 response_dict = {
                     "response": result,
                     "agentId": agent.id,

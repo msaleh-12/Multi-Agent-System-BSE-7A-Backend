@@ -4,8 +4,8 @@ WORKDIR /app
 
 ENV PYTHONUNBUFFERED=1
 
-# Install requirements first to cache dependencies
-COPY requirements.txt ./
+# Install agent-specific requirements (lightweight - no PyTorch)
+COPY agents/research_scout_agent/requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy only agent code (context is backend root)

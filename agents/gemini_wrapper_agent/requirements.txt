@@ -1,0 +1,10 @@
+# Lightweight requirements for gemini_wrapper_agent
+# This agent only uses Gemini API - no local ML models needed
+fastapi>=0.100.0
+uvicorn>=0.23.0
+pydantic>=2.0.0
+python-dotenv>=1.0.0
+google-generativeai>=0.3.0
+aiosqlite>=0.19.0
+httpx>=0.24.0
+PyYAML>=6.0.0

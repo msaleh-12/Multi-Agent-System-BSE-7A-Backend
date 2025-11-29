@@ -107,6 +107,7 @@ class GeminiChatOrchestrator:
             "plagiarism_prevention_agent": ["text_content"],
             "gemini_wrapper_agent": [],  # No required params
             "peer_collaboration_agent": ["team_members", "discussion_logs"],
+            "exam_readiness_agent": ["subject", "assessment_type", "difficulty", "question_count"],
         }
         return required_params.get(agent_id, [])
 
@@ -597,6 +598,8 @@ Now analyze the user's message and respond with ONLY the JSON object (no preambl
             return self._format_for_daily_revision_proctor(base_payload, extracted_params)
         elif agent_id == "peer_collaboration_agent":
             return self._format_for_peer_collaboration(base_payload, extracted_params)
+        elif agent_id == "exam_readiness_agent":
+            return self._format_for_exam_readiness(base_payload, extracted_params)
         else:
             # Fallback: just include extracted params
             _logger.warning(f"Unknown agent {agent_id}, using generic format")
@@ -802,6 +805,52 @@ Now analyze the user's message and respond with ONLY the JSON object (no preambl
                 "action": params.get("action") or "analyze",
                 "discussion_logs": discussion_logs
             }
+        }
+
+    def _format_for_exam_readiness(self, payload: Dict, params: Dict) -> Dict:
+        """Format payload for Exam Readiness Agent."""
+        # Map assessment_type to valid enum values
+        assessment_type = (params.get("assessment_type") or "quiz").lower()
+        valid_types = ["quiz", "exam", "assignment"]
+        if assessment_type not in valid_types:
+            assessment_type = "quiz"
+        
+        # Map difficulty to valid enum values
+        difficulty = (params.get("difficulty") or "medium").lower()
+        valid_difficulties = ["easy", "medium", "hard"]
+        if difficulty not in valid_difficulties:
+            # Map alternative difficulty names
+            difficulty_map = {
+                "beginner": "easy",
+                "intermediate": "medium",
+                "advanced": "hard"
+            }
+            difficulty = difficulty_map.get(difficulty, "medium")
+        
+        # Get question count with default
+        question_count = params.get("question_count") or params.get("num_questions") or 5
+        if isinstance(question_count, str):
+            try:
+                question_count = int(question_count)
+            except ValueError:
+                question_count = 5
+        
+        # Build type_counts - distribute questions by type
+        type_counts = params.get("type_counts")
+        if not type_counts:
+            # Default distribution: all MCQ
+            type_counts = {"mcq": question_count}
+        
+        return {
+            "subject": params.get("subject") or params.get("topic") or "General",
+            "assessment_type": assessment_type,
+            "difficulty": difficulty,
+            "question_count": question_count,
+            "type_counts": type_counts,
+            "allow_latex": params.get("allow_latex", True),
+            "created_by": params.get("created_by") or "supervisor",
+            "use_rag": params.get("use_rag", False),
+            "export_pdf": params.get("export_pdf", False)
         }
 
     def reset_conversation(self):

@@ -5,7 +5,7 @@ import yaml
 from fastapi import FastAPI, Depends, HTTPException, Body, Query
 from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
-from typing import Optional, List
+from typing import Optional, List, Dict
 from datetime import datetime
 from pydantic import BaseModel
 
@@ -30,6 +30,18 @@ class EnhancedRequestPayload(BaseModel):
     autoRoute: bool = True
     conversationId: Optional[str] = None  # For tracking conversation threads
     includeHistory: bool = True  # Whether to use conversation history for context
+    # Exam readiness specific fields (passed through from frontend form)
+    subject: Optional[str] = None
+    assessment_type: Optional[str] = None
+    difficulty: Optional[str] = None
+    question_count: Optional[int] = None
+    type_counts: Optional[Dict[str, int]] = None
+    use_rag: Optional[bool] = None
+    pdf_input_paths: Optional[List[str]] = None
+    rag_top_k: Optional[int] = None
+    rag_max_chars: Optional[int] = None
+    export_pdf: Optional[bool] = None
+    pdf_output_filename: Optional[str] = None
 
 async def periodic_health_checks():
     """Periodically run health checks for all registered agents."""
@@ -271,6 +283,102 @@ async def submit_request(
         role="user",
         content=user_query
     )
+    
+    # CHECK FOR EXPLICIT EXAM READINESS PARAMETERS
+    # If the frontend form sends structured parameters, bypass Gemini extraction
+    # and directly route to exam_readiness_agent
+    if payload.subject and payload.assessment_type and payload.question_count and payload.type_counts:
+        _logger.info(f"Explicit exam parameters detected - bypassing intent identification")
+        
+        # Build explicit payload for exam_readiness_agent
+        explicit_agent_payload = {
+            "subject": payload.subject,
+            "assessment_type": payload.assessment_type,
+            "difficulty": payload.difficulty or "medium",
+            "question_count": payload.question_count,
+            "type_counts": payload.type_counts,
+            "allow_latex": True,
+            "created_by": "frontend_form",
+            "use_rag": payload.use_rag or False,
+            "export_pdf": payload.export_pdf or False,
+        }
+        
+        # Add optional RAG parameters
+        if payload.use_rag:
+            if payload.pdf_input_paths:
+                explicit_agent_payload["pdf_input_paths"] = payload.pdf_input_paths
+            if payload.rag_top_k:
+                explicit_agent_payload["rag_top_k"] = payload.rag_top_k
+            if payload.rag_max_chars:
+                explicit_agent_payload["rag_max_chars"] = payload.rag_max_chars
+        
+        if payload.export_pdf and payload.pdf_output_filename:
+            explicit_agent_payload["pdf_output_filename"] = payload.pdf_output_filename
+        
+        # Check agent health
+        agent = registry.get_agent("exam_readiness_agent")
+        if not agent:
+            return {"status": "ERROR", "error": "exam_readiness_agent not found in registry"}
+        
+        if agent.status != "healthy":
+            return {"status": "ERROR", "error": f"exam_readiness_agent is {agent.status}"}
+        
+        # Forward to exam_readiness_agent directly
+        try:
+            forward_payload = RequestPayload(
+                agentId="exam_readiness_agent",
+                request=user_query,
+                autoRoute=False
+            )
+            
+            agent_response = await forward_to_agent(
+                "exam_readiness_agent",
+                forward_payload,
+                agent_specific=explicit_agent_payload
+            )
+            
+            # Format response - handle both dict and Pydantic model metadata
+            response_data = agent_response.response if hasattr(agent_response, 'response') else agent_response
+            
+            # Safely extract metadata values
+            metadata_obj = getattr(agent_response, 'metadata', None)
+            if metadata_obj is not None:
+                if hasattr(metadata_obj, 'executionTime'):
+                    execution_time = metadata_obj.executionTime
+                elif isinstance(metadata_obj, dict):
+                    execution_time = metadata_obj.get('executionTime', 0)
+                else:
+                    execution_time = 0
+                    
+                if hasattr(metadata_obj, 'cached'):
+                    cached = metadata_obj.cached
+                elif isinstance(metadata_obj, dict):
+                    cached = metadata_obj.get('cached', False)
+                else:
+                    cached = False
+            else:
+                execution_time = 0
+                cached = False
+            
+            return {
+                "response": response_data,
+                "agentId": "exam_readiness_agent",
+                "timestamp": datetime.utcnow().isoformat(),
+                "metadata": {
+                    "executionTime": execution_time,
+                    "agentTrace": ["exam_readiness_agent"],
+                    "participatingAgents": ["exam_readiness_agent"],
+                    "cached": cached
+                },
+                "intent_info": {
+                    "agent_id": "exam_readiness_agent",
+                    "confidence": 1.0,
+                    "reasoning": "Direct form submission with explicit parameters"
+                }
+            }
+        except Exception as e:
+            _logger.error(f"Error forwarding to exam_readiness_agent: {e}", exc_info=True)
+            return {"status": "ERROR", "error": str(e)}
     
     # Check if we've been asking for clarification too many times
     recent_clarifications = 0

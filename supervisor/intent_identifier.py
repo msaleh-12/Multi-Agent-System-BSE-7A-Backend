@@ -142,6 +142,7 @@ Respond with ONLY a JSON object in this EXACT format (no markdown, no backticks)
      * presentation_feedback_agent: REQUIRES "transcript" (the presentation transcript to analyze)
      * daily_revision_proctor_agent: REQUIRES "student_id" (will use default if not provided)
      * peer_collaboration_agent: REQUIRES "team_members" (list of team member names), "discussion_logs" (array of discussion messages)
+     * exam_readiness_agent: REQUIRES "subject" (what subject to assess), "assessment_type" (quiz/exam/assignment), "difficulty" (easy/medium/hard), "question_count" (number of questions)
      * plagiarism_prevention_agent: REQUIRES text content
      * gemini-wrapper: No required params
 
@@ -163,6 +164,7 @@ Respond with ONLY a JSON object in this EXACT format (no markdown, no backticks)
    - For concept reinforcement without weak_topics: "What topics are you struggling with and need extra practice on?"
    - For presentation feedback without transcript: "Please provide the transcript of your presentation that you'd like me to analyze."
    - For peer collaboration without details: "Please provide your team members and discussion logs (messages from your team chat) for collaboration analysis."
+   - For exam readiness without details: "What subject would you like to be assessed on? How many questions and what difficulty level (easy/medium/hard)?"
    - NEVER ask generic questions like "What do you need help with?"
 
 6. **Parameter Extraction**:

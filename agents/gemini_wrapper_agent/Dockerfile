@@ -4,8 +4,8 @@ WORKDIR /app
 
 ENV PYTHONUNBUFFERED=1
 
-# Copy dependency manifest and install first to leverage build cache
-COPY requirements.txt ./
+# Copy agent-specific requirements and install (lightweight - no PyTorch)
+COPY agents/gemini_wrapper_agent/requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code

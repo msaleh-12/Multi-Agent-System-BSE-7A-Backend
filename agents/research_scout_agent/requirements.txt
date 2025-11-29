@@ -1,0 +1,9 @@
+# Lightweight requirements for research_scout_agent
+# This agent only uses web APIs - no local ML models needed
+fastapi>=0.100.0
+uvicorn>=0.23.0
+pydantic>=2.0.0
+python-dotenv>=1.0.0
+httpx>=0.24.0
+requests>=2.28.0
+aiosqlite>=0.19.0

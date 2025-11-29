@@ -26,3 +26,7 @@ unstructured
 reportlab
 requests
 python-multipart
+
+# Use CPU-only torch to avoid huge CUDA downloads (~1.5GB savings)
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch
