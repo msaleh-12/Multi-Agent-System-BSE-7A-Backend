@@ -30,3 +30,8 @@ presentation_feedback:
   ltm_db_path: "./agents/presentation_feedback_agent/ltm_cache.db"
   model_name: "gemini-2.5-flash"
 
+
+peer_collaboration:
+  host: 127.0.0.1
+  port: 5011
+  mode: "local"  # no external API needed
