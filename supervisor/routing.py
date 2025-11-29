@@ -263,6 +263,54 @@ def build_agent_payload(agent_id: str, user_request: str, intent_info: Dict[str,
             }
         }
 
+    elif agent_id in ("peer_collaboration_agent", "peer-collaboration-agent", "peer_collaboration"):
+        # peer_collaboration expects team data and discussion logs
+        import uuid as _uuid
+        import re
+        
+        team_members = extracted.get("team_members") or []
+        if isinstance(team_members, str):
+            team_members = [m.strip() for m in team_members.split(",") if m.strip()]
+        
+        discussion_logs = extracted.get("discussion_logs") or []
+        
+        # Normalize discussion logs to ensure proper format
+        normalized_logs = []
+        if discussion_logs:
+            for log in discussion_logs:
+                if isinstance(log, dict):
+                    normalized_logs.append({
+                        "user_id": log.get("user_id") or log.get("user") or log.get("name") or "unknown",
+                        "message": log.get("message") or log.get("text") or log.get("content") or "",
+                        "timestamp": log.get("timestamp") or log.get("time") or ""
+                    })
+                elif isinstance(log, str):
+                    # Parse string format like "Alice (2025-11-29 10:00): message"
+                    match = re.match(r'^([^(]+)\s*\(([^)]+)\):\s*(.+)$', log.strip())
+                    if match:
+                        normalized_logs.append({
+                            "user_id": match.group(1).strip(),
+                            "timestamp": match.group(2).strip(),
+                            "message": match.group(3).strip().strip('"\'')
+                        })
+                    else:
+                        normalized_logs.append({
+                            "user_id": "unknown",
+                            "message": log,
+                            "timestamp": ""
+                        })
+        
+        payload = {
+            "agent_name": "peer_collaboration_agent",
+            "intent": "analyze_collaboration",
+            "payload": {
+                "project_id": extracted.get("project_id") or str(_uuid.uuid4()),
+                "team_members": team_members,
+                "action": extracted.get("action") or "analyze",
+                "discussion_logs": normalized_logs
+            }
+        }
+
     else:
         # Generic fallback: include extracted params under `params`
         if extracted:

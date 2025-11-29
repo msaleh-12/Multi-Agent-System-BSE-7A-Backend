@@ -205,7 +205,11 @@
       "team analysis",
       "group feedback"
     ],
-    "status": "offline"
+    "required_params": [
+      "team_members",
+      "discussion_logs"
+    ],
+    "status": "healthy"
   },
   {
     "id": "adaptive_flashcard_agent",

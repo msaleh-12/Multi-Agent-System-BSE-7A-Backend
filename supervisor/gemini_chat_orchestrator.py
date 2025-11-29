@@ -106,6 +106,7 @@ class GeminiChatOrchestrator:
             "assignment_coach_agent": ["task_description"],
             "plagiarism_prevention_agent": ["text_content"],
             "gemini_wrapper_agent": [],  # No required params
+            "peer_collaboration_agent": ["team_members", "discussion_logs"],
         }
         return required_params.get(agent_id, [])
 
@@ -594,6 +595,8 @@ Now analyze the user's message and respond with ONLY the JSON object (no preambl
             return self._format_for_presentation_feedback(base_payload, extracted_params)
         elif agent_id == "daily_revision_proctor_agent":
             return self._format_for_daily_revision_proctor(base_payload, extracted_params)
+        elif agent_id == "peer_collaboration_agent":
+            return self._format_for_peer_collaboration(base_payload, extracted_params)
         else:
             # Fallback: just include extracted params
             _logger.warning(f"Unknown agent {agent_id}, using generic format")
@@ -771,6 +774,33 @@ Now analyze the user's message and respond with ONLY the JSON object (no preambl
                 "request_type": params.get("request_type") or "analysis",
                 "supervisor_id": "supervisor_main",
                 "priority": "normal"
+            }
+        }
+
+    def _format_for_peer_collaboration(self, payload: Dict, params: Dict) -> Dict:
+        """Format payload for Peer Collaboration Agent."""
+        import uuid as _uuid
+        
+        # Get team members - ensure it's a list
+        team_members = params.get("team_members", [])
+        if isinstance(team_members, str):
+            # Split by comma if it's a string
+            team_members = [m.strip() for m in team_members.split(",") if m.strip()]
+        
+        # Get discussion logs - ensure it's a list of proper format
+        discussion_logs = params.get("discussion_logs", [])
+        if not discussion_logs:
+            # Create empty discussion logs structure
+            discussion_logs = []
+        
+        return {
+            "agent_name": "peer_collaboration_agent",
+            "intent": "analyze_collaboration",
+            "payload": {
+                "project_id": params.get("project_id") or str(_uuid.uuid4()),
+                "team_members": team_members,
+                "action": params.get("action") or "analyze",
+                "discussion_logs": discussion_logs
             }
         }
 
