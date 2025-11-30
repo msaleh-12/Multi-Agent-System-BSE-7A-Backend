@@ -408,6 +408,76 @@ def build_agent_payload(agent_id: str, user_request: str, intent_info: Dict[str,
             "preferences": preferences
         }
 
+    elif agent_id in ("study_scheduler_agent", "study-scheduler-agent", "study_scheduler"):
+        # study_scheduler expects subjects, availability, deadlines, and performance_feedback
+        
+        # Extract subjects - can be a list or string
+        subjects = extracted.get("subjects") or extracted.get("subject") or []
+        if isinstance(subjects, str):
+            subjects = [s.strip() for s in subjects.split(",") if s.strip()]
+        
+        # Build subjects with difficulty
+        subjects_data = []
+        for subj in subjects:
+            if isinstance(subj, dict):
+                subjects_data.append({
+                    "name": subj.get("name", str(subj)),
+                    "difficulty": subj.get("difficulty", "medium")
+                })
+            else:
+                subjects_data.append({
+                    "name": str(subj),
+                    "difficulty": "medium"
+                })
+        
+        # Extract availability
+        availability = extracted.get("availability", {})
+        if not isinstance(availability, dict):
+            availability = {}
+        
+        availability_data = {
+            "preferred_days": availability.get("preferred_days", ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]),
+            "preferred_times": availability.get("preferred_times", ["6:00 PM"]),
+            "daily_study_limit_hours": int(availability.get("daily_study_limit_hours", 3))
+        }
+        
+        # Extract deadlines
+        deadlines = extracted.get("deadlines", [])
+        if not isinstance(deadlines, list):
+            deadlines = []
+        
+        deadlines_data = []
+        for d in deadlines:
+            if isinstance(d, dict):
+                deadlines_data.append({
+                    "subject": d.get("subject", "General"),
+                    "exam_date": d.get("exam_date", d.get("date", "2025-12-31"))
+                })
+        
+        # Extract performance feedback
+        perf = extracted.get("performance_feedback", {})
+        if not isinstance(perf, dict):
+            perf = {}
+        
+        performance_feedback = {
+            "AI": perf.get("AI", "average"),
+            "OS": perf.get("OS", "average"),
+            "SPM": perf.get("SPM", "average")
+        }
+        
+        payload = {
+            "agent_name": "study_scheduler_agent",
+            "intent": "generate_study_schedule",
+            "payload": {
+                "student_id": extracted.get("student_id") or extracted.get("user_id") or "default_student",
+                "subjects": subjects_data,
+                "availability": availability_data,
+                "deadlines": deadlines_data,
+                "performance_feedback": performance_feedback,
+                "priority": extracted.get("priority", "normal")
+            }
+        }
+
     else:
         # Generic fallback: include extracted params under `params`
         if extracted:

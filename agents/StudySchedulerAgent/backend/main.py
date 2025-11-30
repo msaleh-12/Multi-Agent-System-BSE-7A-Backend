@@ -1,13 +1,42 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from typing import List, Dict
+from typing import List, Dict, Any, Optional
 import datetime
+import uuid
+import sys
+import logging
+
+# Add parent path for shared models when running in Docker
+sys.path.insert(0, '/app')
 
 # Import models, including the helper class SubjectPriority
 from models import (
     AgentInput, AgentOutput, ScheduleSummary, RecommendedSession,
-    AdaptiveAction, Reminder, ReportSummary, SubjectPriority
+    AdaptiveAction, Reminder, ReportSummary, SubjectPriority,
+    SubjectDetail, Availability, Deadline, PerformanceFeedback, Context
 )
+
+# Try to import shared models for supervisor communication
+try:
+    from shared.models import TaskEnvelope, CompletionReport
+except ImportError:
+    # Define fallback models if shared module not available
+    from pydantic import BaseModel
+    
+    class TaskEnvelope(BaseModel):
+        message_id: str = ""
+        sender: str = ""
+        task: Any = None
+    
+    class CompletionReport(BaseModel):
+        message_id: str = ""
+        sender: str = ""
+        recipient: str = ""
+        related_message_id: str = ""
+        status: str = ""
+        results: dict = {}
+
+_logger = logging.getLogger(__name__)
 
 # Initialize FastAPI
 app = FastAPI(
@@ -197,3 +226,168 @@ async def handle_schedule_request(data: AgentInput):
 def health_check():
     """Simple health check endpoint for the Supervisor Agent."""
     return {"status": "ok", "agent_name": "Study Scheduler Agent"}
+
+
+@app.get("/health")
+def health_check_no_slash():
+    """Health check endpoint without trailing slash."""
+    return {
+        "status": "healthy",
+        "agent_name": "study_scheduler_agent",
+        "version": "1.0.0",
+        "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat()
+    }
+
+
+@app.post("/process", response_model=CompletionReport)
+async def process_task(request: Request):
+    """
+    Main processing endpoint for supervisor TaskEnvelope format.
+    Handles structured format from supervisor/orchestrator.
+    """
+    try:
+        body = await request.json()
+        _logger.info(f"Received process request: {body}")
+        
+        # Try to parse as TaskEnvelope
+        try:
+            task_envelope = TaskEnvelope(**body)
+            task_params = task_envelope.task.parameters if hasattr(task_envelope.task, 'parameters') else {}
+        except Exception:
+            # If not TaskEnvelope format, use body directly as parameters
+            task_params = body
+            task_envelope = None
+        
+        # Extract parameters from structured or simple format
+        if "agent_name" in task_params and "intent" in task_params and "payload" in task_params:
+            # Structured format from orchestrator
+            payload = task_params["payload"]
+        else:
+            # Simple format - use task_params directly
+            payload = task_params
+        
+        # Build AgentInput from payload
+        agent_input = _build_agent_input_from_payload(payload)
+        
+        # Generate schedule
+        output = generate_schedule(agent_input)
+        
+        # Convert output to response format
+        result_data = {
+            "student_id": output.student_id,
+            "schedule_summary": output.schedule_summary.model_dump(),
+            "recommended_schedule": [s.model_dump() for s in output.recommended_schedule],
+            "adaptive_actions": [a.model_dump() for a in output.adaptive_actions],
+            "reminders": [r.model_dump() for r in output.reminders],
+            "report_summary": output.report_summary.model_dump()
+        }
+        
+        # Build response message
+        response_message = _build_response_message(output)
+        
+        return CompletionReport(
+            message_id=str(uuid.uuid4()),
+            sender="study_scheduler_agent",
+            recipient=task_envelope.sender if task_envelope else "supervisor",
+            related_message_id=task_envelope.message_id if task_envelope else "",
+            status="SUCCESS",
+            results={
+                "response": response_message,
+                "schedule_data": result_data
+            }
+        )
+        
+    except Exception as e:
+        _logger.error(f"Error processing request: {e}", exc_info=True)
+        return CompletionReport(
+            message_id=str(uuid.uuid4()),
+            sender="study_scheduler_agent",
+            recipient="supervisor",
+            related_message_id="",
+            status="ERROR",
+            results={"error": str(e)}
+        )
+
+
+def _build_agent_input_from_payload(payload: Dict[str, Any]) -> AgentInput:
+    """Convert supervisor payload to AgentInput format."""
+    
+    # Extract subjects from payload
+    subjects_data = payload.get("subjects", [])
+    if isinstance(subjects_data, list):
+        subjects = [
+            SubjectDetail(
+                name=s.get("name", s) if isinstance(s, dict) else str(s),
+                difficulty=s.get("difficulty", "medium") if isinstance(s, dict) else "medium"
+            ) for s in subjects_data
+        ]
+    else:
+        subjects = []
+    
+    # Extract availability
+    availability_data = payload.get("availability", {})
+    availability = Availability(
+        preferred_days=availability_data.get("preferred_days", ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]),
+        preferred_times=availability_data.get("preferred_times", ["6:00 PM"]),
+        daily_study_limit_hours=availability_data.get("daily_study_limit_hours", 3)
+    )
+    
+    # Extract deadlines
+    deadlines_data = payload.get("deadlines", [])
+    deadlines = [
+        Deadline(
+            subject=d.get("subject", "General"),
+            exam_date=d.get("exam_date", d.get("date", "2025-12-31"))
+        ) for d in deadlines_data
+    ] if deadlines_data else []
+    
+    # Extract performance feedback with defaults
+    perf_data = payload.get("performance_feedback", {})
+    performance_feedback = PerformanceFeedback(
+        AI=perf_data.get("AI", "average"),
+        OS=perf_data.get("OS", "average"),
+        SPM=perf_data.get("SPM", "average")
+    )
+    
+    # Context
+    context = Context(
+        request_type="generate_study_schedule",
+        priority=payload.get("priority", "normal")
+    )
+    
+    return AgentInput(
+        student_id=payload.get("student_id", "default_student"),
+        profile={"subjects": subjects},
+        availability=availability,
+        deadlines=deadlines,
+        performance_feedback=performance_feedback,
+        context=context
+    )
+
+
+def _build_response_message(output: AgentOutput) -> str:
+    """Build a human-readable response message from the schedule output."""
+    message = f"📅 **Study Schedule Created for Student {output.student_id}**\n\n"
+    
+    summary = output.schedule_summary
+    message += f"**Summary:**\n"
+    message += f"- Total Sessions: {summary.total_sessions}\n"
+    message += f"- Total Study Hours: {summary.total_study_hours}\n"
+    message += f"- Coverage: {summary.coverage_percentage}\n"
+    message += f"- Next Revision: {summary.next_revision_day}\n\n"
+    
+    message += f"**Recommended Schedule:**\n"
+    for session in output.recommended_schedule:
+        message += f"- {session.day}: {session.subject} ({session.time})\n"
+    
+    message += f"\n**Reminders:**\n"
+    for reminder in output.reminders:
+        message += f"- [{reminder.type}] {reminder.message}\n"
+    
+    report = output.report_summary
+    message += f"\n**Performance Report:**\n"
+    message += f"- Consistency Score: {report.consistency_score}%\n"
+    message += f"- Time Efficiency: {report.time_efficiency}\n"
+    message += f"- Performance Trend: {report.performance_trend}\n"
+    
+    return message

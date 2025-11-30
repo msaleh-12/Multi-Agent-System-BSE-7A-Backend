@@ -146,6 +146,7 @@ Respond with ONLY a JSON object in this EXACT format (no markdown, no backticks)
      * exam_readiness_agent: REQUIRES "subject" (what subject to assess), "assessment_type" (quiz/exam/assignment), "difficulty" (easy/medium/hard), "question_count" (number of questions)
      * plagiarism_prevention_agent: REQUIRES text content
      * lecture_insight_agent: REQUIRES "audio_url" (URL to lecture audio file) OR "audio_data" (base64 encoded audio)
+     * study_scheduler_agent: REQUIRES "subjects" (list of subjects to schedule study time for). OPTIONAL: "availability" (preferred days/times), "deadlines" (exam dates), "performance_feedback" (weak/strong subjects)
      * gemini-wrapper: No required params
 
 3. **Low Confidence (< 0.5)**:
@@ -167,6 +168,7 @@ Respond with ONLY a JSON object in this EXACT format (no markdown, no backticks)
    - For presentation feedback without transcript: "Please provide the transcript of your presentation that you'd like me to analyze."
    - For peer collaboration without details: "Please provide your team members and discussion logs (messages from your team chat) for collaboration analysis."
    - For exam readiness without details: "What subject would you like to be assessed on? How many questions and what difficulty level (easy/medium/hard)?"
+   - For study scheduler without subjects: "What subjects would you like me to create a study schedule for? (e.g., Math, Physics, Programming)"
    - NEVER ask generic questions like "What do you need help with?"
 
 6. **Parameter Extraction**:

@@ -109,6 +109,7 @@ class GeminiChatOrchestrator:
             "peer_collaboration_agent": ["team_members", "discussion_logs"],
             "exam_readiness_agent": ["subject", "assessment_type", "difficulty", "question_count"],
             "lecture_insight_agent": ["audio_url"],  # Requires audio URL or audio_data
+            "study_scheduler_agent": ["subjects"],  # Requires list of subjects to schedule
         }
         return required_params.get(agent_id, [])
 
@@ -301,6 +302,17 @@ Now analyze the user's message and respond with ONLY the JSON object (no preambl
 - Example: "Transcribe and summarize my class audio"
 → Ask for audio_url: "Please provide the URL to your lecture audio file (MP3, WAV, or M4A format)"
 - Keywords: lecture, recording, audio, lecture recording, class recording, lecture notes, analyze lecture, transcribe lecture, lecture summary
+
+### Study Scheduler Agent
+- Required: subjects (list of subjects to create a study schedule for)
+- Optional: student_id, availability (preferred_days, preferred_times, daily_study_limit_hours), deadlines (exam dates), performance_feedback (AI/OS/SPM: weak/average/strong)
+- Example: "Create a study schedule for Math, Physics, and Chemistry"
+→ Extracted: {subjects: ["Math", "Physics", "Chemistry"]}
+- Example: "Make a timetable for my AI and OS exams next week"
+→ Extracted: {subjects: ["AI", "OS"], deadlines: [{subject: "AI", exam_date: "next week"}, {subject: "OS", exam_date: "next week"}]}
+- Example: "I need a study plan. I can study 3 hours per day on weekdays."
+→ Ask for subjects: "What subjects would you like me to create a study schedule for?"
+- Keywords: schedule, timetable, create schedule, make timetable, study plan, time management, organize time, plan my study, study schedule
 """
         return definitions
 
@@ -612,6 +624,8 @@ Now analyze the user's message and respond with ONLY the JSON object (no preambl
             return self._format_for_exam_readiness(base_payload, extracted_params)
         elif agent_id == "lecture_insight_agent":
             return self._format_for_lecture_insight(base_payload, extracted_params)
+        elif agent_id == "study_scheduler_agent":
+            return self._format_for_study_scheduler(base_payload, extracted_params)
         else:
             # Fallback: just include extracted params
             _logger.warning(f"Unknown agent {agent_id}, using generic format")
@@ -907,6 +921,76 @@ Now analyze the user's message and respond with ONLY the JSON object (no preambl
             "audio_input": audio_input,
             "user_id": params.get("user_id") or params.get("student_id") or "default_user",
             "preferences": preferences
+        }
+
+    def _format_for_study_scheduler(self, payload: Dict, params: Dict) -> Dict:
+        """Format for Study Scheduler Agent."""
+        # Extract subjects - can be a list or string
+        subjects = params.get("subjects") or params.get("subject") or []
+        if isinstance(subjects, str):
+            # Split comma-separated subjects
+            subjects = [s.strip() for s in subjects.split(",") if s.strip()]
+        
+        # Build subjects with difficulty (default to medium)
+        subjects_data = []
+        for subj in subjects:
+            if isinstance(subj, dict):
+                subjects_data.append({
+                    "name": subj.get("name", str(subj)),
+                    "difficulty": subj.get("difficulty", "medium")
+                })
+            else:
+                subjects_data.append({
+                    "name": str(subj),
+                    "difficulty": "medium"
+                })
+        
+        # Extract availability
+        availability = params.get("availability", {})
+        if not isinstance(availability, dict):
+            availability = {}
+        
+        availability_data = {
+            "preferred_days": availability.get("preferred_days", ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]),
+            "preferred_times": availability.get("preferred_times", ["6:00 PM"]),
+            "daily_study_limit_hours": int(availability.get("daily_study_limit_hours", 3))
+        }
+        
+        # Extract deadlines
+        deadlines = params.get("deadlines", [])
+        if not isinstance(deadlines, list):
+            deadlines = []
+        
+        deadlines_data = []
+        for d in deadlines:
+            if isinstance(d, dict):
+                deadlines_data.append({
+                    "subject": d.get("subject", "General"),
+                    "exam_date": d.get("exam_date", d.get("date", "2025-12-31"))
+                })
+        
+        # Extract performance feedback
+        perf = params.get("performance_feedback", {})
+        if not isinstance(perf, dict):
+            perf = {}
+        
+        performance_feedback = {
+            "AI": perf.get("AI", "average"),
+            "OS": perf.get("OS", "average"),
+            "SPM": perf.get("SPM", "average")
+        }
+        
+        return {
+            "agent_name": "study_scheduler_agent",
+            "intent": "generate_study_schedule",
+            "payload": {
+                "student_id": params.get("student_id") or params.get("user_id") or "default_student",
+                "subjects": subjects_data,
+                "availability": availability_data,
+                "deadlines": deadlines_data,
+                "performance_feedback": performance_feedback,
+                "priority": params.get("priority", "normal")
+            }
         }
 
     def reset_conversation(self):

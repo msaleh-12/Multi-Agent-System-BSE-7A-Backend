@@ -370,7 +370,16 @@
       "plan my study",
       "study schedule"
     ],
-    "status": "offline"
+    "required_params": [
+      "subjects"
+    ],
+    "optional_params": [
+      "student_id",
+      "availability",
+      "deadlines",
+      "performance_feedback"
+    ],
+    "status": "healthy"
   },
   {
     "id": "exam_readiness_agent",
