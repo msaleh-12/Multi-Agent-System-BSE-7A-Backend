@@ -110,6 +110,7 @@ class GeminiChatOrchestrator:
             "exam_readiness_agent": ["subject", "assessment_type", "difficulty", "question_count"],
             "lecture_insight_agent": ["audio_url"],  # Requires audio URL or audio_data
             "study_scheduler_agent": ["subjects"],  # Requires list of subjects to schedule
+            "question_anticipator_agent": ["syllabus"],  # Requires syllabus/topics to predict questions from
         }
         return required_params.get(agent_id, [])
 
@@ -313,6 +314,17 @@ Now analyze the user's message and respond with ONLY the JSON object (no preambl
 - Example: "I need a study plan. I can study 3 hours per day on weekdays."
 → Ask for subjects: "What subjects would you like me to create a study schedule for?"
 - Keywords: schedule, timetable, create schedule, make timetable, study plan, time management, organize time, plan my study, study schedule
+
+### Question Anticipator Agent
+- Required: syllabus (list of topics/subjects to predict questions from)
+- Optional: past_papers (list of previous exam questions), exam_pattern (mcqs, short_questions, long_questions counts), difficulty_preference (easy/medium/hard), weightage (topic importance scores)
+- Example: "Predict exam questions for Data Structures and Algorithms"
+→ Extracted: {syllabus: ["Data Structures", "Algorithms"]}
+- Example: "What questions might come in my OS exam? Topics: processes, memory management, file systems"
+→ Extracted: {syllabus: ["processes", "memory management", "file systems"]}
+- Example: "Predict likely exam questions"
+→ Ask for syllabus: "What subjects or topics would you like me to predict exam questions for?"
+- Keywords: predict, anticipate, exam questions, what might come, likely questions, past papers, exam prediction, question prediction
 """
         return definitions
 
@@ -626,6 +638,8 @@ Now analyze the user's message and respond with ONLY the JSON object (no preambl
             return self._format_for_lecture_insight(base_payload, extracted_params)
         elif agent_id == "study_scheduler_agent":
             return self._format_for_study_scheduler(base_payload, extracted_params)
+        elif agent_id == "question_anticipator_agent":
+            return self._format_for_question_anticipator(base_payload, extracted_params)
         else:
             # Fallback: just include extracted params
             _logger.warning(f"Unknown agent {agent_id}, using generic format")
@@ -990,6 +1004,60 @@ Now analyze the user's message and respond with ONLY the JSON object (no preambl
                 "deadlines": deadlines_data,
                 "performance_feedback": performance_feedback,
                 "priority": params.get("priority", "normal")
+            }
+        }
+
+    def _format_for_question_anticipator(self, payload: Dict, params: Dict) -> Dict:
+        """Format for Question Anticipator Agent."""
+        # Extract syllabus - can be a list, string, or topic
+        syllabus = params.get("syllabus") or params.get("topics") or params.get("subjects") or []
+        if isinstance(syllabus, str):
+            syllabus = [s.strip() for s in syllabus.split(",") if s.strip()]
+        
+        # If topic/subject is provided separately, add it to syllabus
+        topic = params.get("topic") or params.get("subject")
+        if topic and isinstance(topic, str) and topic not in syllabus:
+            syllabus.insert(0, topic)
+        
+        # Extract past papers
+        past_papers = params.get("past_papers", [])
+        if not isinstance(past_papers, list):
+            past_papers = []
+        
+        past_papers_data = []
+        for pp in past_papers:
+            if isinstance(pp, dict):
+                past_papers_data.append({
+                    "year": pp.get("year", "Unknown"),
+                    "questions": pp.get("questions", [])
+                })
+        
+        # Extract exam pattern
+        exam_pattern = params.get("exam_pattern", {})
+        if not isinstance(exam_pattern, dict):
+            exam_pattern = {}
+        
+        exam_pattern_data = {
+            "mcqs": int(exam_pattern.get("mcqs", 10)),
+            "short_questions": int(exam_pattern.get("short_questions", 5)),
+            "long_questions": int(exam_pattern.get("long_questions", 3))
+        }
+        
+        # Extract other parameters
+        difficulty_preference = params.get("difficulty_preference") or params.get("difficulty") or "medium"
+        weightage = params.get("weightage", {})
+        include_answers = params.get("include_answers", False)
+        
+        return {
+            "agent_name": "question_anticipator_agent",
+            "intent": "predict_questions",
+            "payload": {
+                "syllabus": syllabus,
+                "past_papers": past_papers_data,
+                "exam_pattern": exam_pattern_data,
+                "weightage": weightage if isinstance(weightage, dict) else {},
+                "difficulty_preference": difficulty_preference,
+                "include_answers": include_answers
             }
         }
 

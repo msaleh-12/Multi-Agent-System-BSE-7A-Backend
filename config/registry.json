@@ -296,7 +296,7 @@
   {
     "id": "question_anticipator_agent",
     "name": "Exam Question Predictor",
-    "url": "http://question-anticipator-agent:5021",
+    "url": "http://question-anticipator-agent:5022",
     "description": "ONLY use for PREDICTING or ANTICIPATING likely exam questions based on syllabus and past papers. Analyzes: historical patterns, topic frequency, question trends. Use for: 'predict exam questions', 'what might come in exam', 'likely questions', 'analyze past papers', NOT for creating quizzes or practice questions.",
     "capabilities": [
       "exam-prediction",
@@ -316,7 +316,16 @@
       "syllabus analysis",
       "question prediction"
     ],
-    "status": "offline"
+    "required_params": [
+      "syllabus"
+    ],
+    "optional_params": [
+      "past_papers",
+      "exam_pattern",
+      "difficulty_preference",
+      "weightage"
+    ],
+    "status": "healthy"
   },
   {
     "id": "daily_revision_proctor_agent",

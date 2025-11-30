@@ -478,6 +478,61 @@ def build_agent_payload(agent_id: str, user_request: str, intent_info: Dict[str,
             }
         }
 
+    elif agent_id in ("question_anticipator_agent", "question-anticipator-agent", "question_anticipator"):
+        # question_anticipator expects syllabus, past_papers, exam_pattern
+        
+        # Extract syllabus - can be a list, string, or topic
+        syllabus = extracted.get("syllabus") or extracted.get("topics") or extracted.get("subjects") or []
+        if isinstance(syllabus, str):
+            syllabus = [s.strip() for s in syllabus.split(",") if s.strip()]
+        
+        # If topic/subject is provided separately, add it to syllabus
+        topic = extracted.get("topic") or extracted.get("subject")
+        if topic and isinstance(topic, str) and topic not in syllabus:
+            syllabus.insert(0, topic)
+        
+        # Extract past papers
+        past_papers = extracted.get("past_papers", [])
+        if not isinstance(past_papers, list):
+            past_papers = []
+        
+        past_papers_data = []
+        for pp in past_papers:
+            if isinstance(pp, dict):
+                past_papers_data.append({
+                    "year": pp.get("year", "Unknown"),
+                    "questions": pp.get("questions", [])
+                })
+        
+        # Extract exam pattern
+        exam_pattern = extracted.get("exam_pattern", {})
+        if not isinstance(exam_pattern, dict):
+            exam_pattern = {}
+        
+        exam_pattern_data = {
+            "mcqs": int(exam_pattern.get("mcqs", 10)),
+            "short_questions": int(exam_pattern.get("short_questions", 5)),
+            "long_questions": int(exam_pattern.get("long_questions", 3))
+        }
+        
+        # Extract other parameters
+        difficulty_preference = extracted.get("difficulty_preference") or extracted.get("difficulty") or "medium"
+        weightage = extracted.get("weightage", {})
+        include_answers = extracted.get("include_answers", False)
+        
+        payload = {
+            "agent_name": "question_anticipator_agent",
+            "intent": "predict_questions",
+            "payload": {
+                "syllabus": syllabus,
+                "past_papers": past_papers_data,
+                "exam_pattern": exam_pattern_data,
+                "weightage": weightage if isinstance(weightage, dict) else {},
+                "difficulty_preference": difficulty_preference,
+                "include_answers": include_answers
+            }
+        }
+
     else:
         # Generic fallback: include extracted params under `params`
         if extracted:

@@ -147,6 +147,7 @@ Respond with ONLY a JSON object in this EXACT format (no markdown, no backticks)
      * plagiarism_prevention_agent: REQUIRES text content
      * lecture_insight_agent: REQUIRES "audio_url" (URL to lecture audio file) OR "audio_data" (base64 encoded audio)
      * study_scheduler_agent: REQUIRES "subjects" (list of subjects to schedule study time for). OPTIONAL: "availability" (preferred days/times), "deadlines" (exam dates), "performance_feedback" (weak/strong subjects)
+     * question_anticipator_agent: REQUIRES "syllabus" (list of topics/subjects to predict questions from). OPTIONAL: "past_papers" (previous exam questions), "exam_pattern" (mcqs/short/long counts), "difficulty_preference" (easy/medium/hard)
      * gemini-wrapper: No required params
 
 3. **Low Confidence (< 0.5)**:
@@ -169,6 +170,7 @@ Respond with ONLY a JSON object in this EXACT format (no markdown, no backticks)
    - For peer collaboration without details: "Please provide your team members and discussion logs (messages from your team chat) for collaboration analysis."
    - For exam readiness without details: "What subject would you like to be assessed on? How many questions and what difficulty level (easy/medium/hard)?"
    - For study scheduler without subjects: "What subjects would you like me to create a study schedule for? (e.g., Math, Physics, Programming)"
+   - For question anticipator without syllabus: "What subjects or topics would you like me to predict exam questions for? (e.g., Data Structures, Operating Systems)"
    - NEVER ask generic questions like "What do you need help with?"
 
 6. **Parameter Extraction**:
