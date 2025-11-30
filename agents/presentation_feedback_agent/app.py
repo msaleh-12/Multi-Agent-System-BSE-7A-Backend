@@ -92,7 +92,7 @@ async def ensure_initialized():
         if not api_key:
             raise ValueError("PRESENTATION_FEEDBACK_GEMINI_API_KEY must be set")
 
-        model_name = os.getenv("GEMINI_MODEL", "gemini-2.0-flash-exp")
+        model_name = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
         analyzer = PresentationAnalyzer(api_key=api_key, model_name=model_name)
 
         db_path = os.getenv("LTM_DB_PATH", "./agents/presentation_feedback_agent/ltm_cache.db")

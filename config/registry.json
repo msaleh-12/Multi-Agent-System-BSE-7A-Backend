@@ -21,7 +21,7 @@
       "how does",
       "why"
     ],
-    "status": "offline"
+    "status": "healthy"
   },
   {
     "id": "adaptive_quiz_master_agent",
@@ -47,7 +47,7 @@
       "true false questions",
       "generate questions"
     ],
-    "status": "offline"
+    "status": "healthy"
   },
   {
     "id": "assignment_coach_agent",
@@ -72,7 +72,7 @@
       "assignment guidance",
       "understand assignment"
     ],
-    "status": "offline"
+    "status": "healthy"
   },
   {
     "id": "plagiarism_prevention_agent",
@@ -97,7 +97,7 @@
       "authenticity",
       "improve originality"
     ],
-    "status": "offline"
+    "status": "healthy"
   },
   {
     "id": "research_scout_agent",
@@ -124,7 +124,7 @@
       "academic sources",
       "journals"
     ],
-    "status": "offline"
+    "status": "healthy"
   },
   {
     "id": "concept_reinforcement_agent",
@@ -153,7 +153,7 @@
     "required_params": [
       "weak_topics"
     ],
-    "status": "offline"
+    "status": "healthy"
   },
   {
     "id": "citation_manager_agent",
@@ -179,7 +179,7 @@
       "generate citation",
       "create citation"
     ],
-    "status": "offline"
+    "status": "healthy"
   },
   {
     "id": "peer_collaboration_agent",
@@ -209,7 +209,7 @@
       "team_members",
       "discussion_logs"
     ],
-    "status": "offline"
+    "status": "healthy"
   },
   {
     "id": "adaptive_flashcard_agent",
@@ -260,7 +260,7 @@
     "required_params": [
       "transcript"
     ],
-    "status": "offline"
+    "status": "healthy"
   },
   {
     "id": "lecture_insight_agent",
@@ -291,7 +291,7 @@
     "required_params": [
       "audio_url"
     ],
-    "status": "offline"
+    "status": "healthy"
   },
   {
     "id": "question_anticipator_agent",
@@ -354,7 +354,7 @@
     "required_params": [
       "student_id"
     ],
-    "status": "offline"
+    "status": "healthy"
   },
   {
     "id": "study_scheduler_agent",
@@ -388,7 +388,7 @@
       "deadlines",
       "performance_feedback"
     ],
-    "status": "offline"
+    "status": "healthy"
   },
   {
     "id": "exam_readiness_agent",
@@ -419,6 +419,6 @@
       "difficulty",
       "question_count"
     ],
-    "status": "offline"
+    "status": "healthy"
   }
 ]

@@ -68,7 +68,7 @@ async def generate_summary(state: AssignmentState) -> AssignmentState:
         
         if _configure_gemini():
             try:
-                model = genai.GenerativeModel('gemini-2.0-flash')
+                model = genai.GenerativeModel('gemini-2.5-flash')
                 prompt = f"""Create a concise 2-3 sentence summary for this assignment:
 Title: {title}
 Description: {description}
@@ -105,7 +105,7 @@ async def create_task_plan(state: AssignmentState) -> AssignmentState:
         
         if _configure_gemini():
             try:
-                model = genai.GenerativeModel('gemini-2.0-flash')
+                model = genai.GenerativeModel('gemini-2.5-flash')
                 prompt = f"""Create a detailed 4-step task plan for this assignment:
 Title: {title}
 Description: {description}
@@ -170,7 +170,7 @@ async def recommend_resources(state: AssignmentState) -> AssignmentState:
         
         if _configure_gemini():
             try:
-                model = genai.GenerativeModel('gemini-2.0-flash')
+                model = genai.GenerativeModel('gemini-2.5-flash')
                 prompt = f"""Recommend 3 specific learning resources for this assignment:
 Assignment: {title}
 Subject: {subject}
@@ -257,7 +257,7 @@ async def generate_feedback(state: AssignmentState) -> AssignmentState:
         
         if _configure_gemini():
             try:
-                model = genai.GenerativeModel('gemini-2.0-flash')
+                model = genai.GenerativeModel('gemini-2.5-flash')
                 prompt = f"""Generate personalized feedback and motivation for a student:
 Assignment: {title}
 Progress: {progress_pct}%

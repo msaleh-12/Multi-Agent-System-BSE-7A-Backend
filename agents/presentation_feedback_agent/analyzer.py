@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 class PresentationAnalyzer:
     """Analyzes presentation transcripts and provides structured feedback."""
 
-    def __init__(self, api_key: str, model_name: str = "gemini-2.0-flash-exp"):
+    def __init__(self, api_key: str, model_name: str = "gemini-2.5-flash"):
         """
         Initialize the analyzer with Gemini API.
 

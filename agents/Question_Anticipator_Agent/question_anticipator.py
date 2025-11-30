@@ -53,14 +53,15 @@ except Exception:
 # --------------- Config ---------------
 CHROMA_DB_PATH      = os.getenv("CHROMA_DB_PATH", "./chroma_db")
 EMBEDDING_MODEL     = os.getenv("EMBEDDING_MODEL", "all-MiniLM-L6-v2")
-GEMINI_API_KEY      = os.getenv("GEMINI_API_KEY")  # get from https://makersuite.google.com/app/apikey
+# Use dedicated API key for this agent to avoid rate limits, fallback to shared key
+GEMINI_API_KEY      = os.getenv("QUESTION_ANTICIPATOR_GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY")
 
 # Configure Gemini
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
 
 LLM_PROVIDER        = os.getenv("LLM_PROVIDER", "gemini").lower()   # default → Gemini
-LLM_MODEL           = os.getenv("LLM_MODEL", "models/gemini-2.0-flash-exp")
+LLM_MODEL           = os.getenv("LLM_MODEL", "gemini-2.5-flash")
 GROK_API_KEY        = os.getenv("GROK_API_KEY")
 OPENAI_API_KEY      = os.getenv("OPENAI_API_KEY")
 ANTHROPIC_API_KEY   = os.getenv("ANTHROPIC_API_KEY")
@@ -310,7 +311,7 @@ class QuestionGenerator:
         if LLM_PROVIDER == "gemini" and GEMINI_API_KEY:
             try:
                 class GeminiChat:
-                    def __init__(self, model_name="models/gemini-2.0-flash-exp"):
+                    def __init__(self, model_name="gemini-2.5-flash"):
                         self.model_name = model_name
                         self.model = genai.GenerativeModel(model_name)
 
